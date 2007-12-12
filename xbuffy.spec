@@ -12,7 +12,7 @@ Source:		%{name}-%{version}.tar.bz2
 Url:		ftp://ftp.virginia.edu:/pub/xbuffy/
 Patch0:		xbuffy-3.4-multiple-box.patch.bz2
 Patch1:		xbuffy-nntp-gcc331.patch.bz2
-Buildrequires:	XFree86-devel
+Buildrequires:	X11-devel
 BuildRoot:	%{_tmppath}/%{name}-buildroot
 
 %description
