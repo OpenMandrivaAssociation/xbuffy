@@ -1,6 +1,6 @@
 %define name xbuffy
 %define version 3.4
-%define release 8mdk
+%define release %mkrel 8
 
 Summary:	X-based multiple mailbox biff
 Name:		%{name}
