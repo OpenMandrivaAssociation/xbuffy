@@ -1,6 +1,6 @@
 %define name xbuffy
 %define version 3.4
-%define release %mkrel 12
+%define release %mkrel 13
 
 Summary:	X-based multiple mailbox biff
 Name:		%{name}
@@ -10,9 +10,11 @@ License:	MIT
 Group:		Graphical desktop/Other
 Source:		%{name}-%{version}.tar.bz2
 Url:		ftp://ftp.virginia.edu:/pub/xbuffy/
-Patch0:		xbuffy-3.4-multiple-box.patch.bz2
-Patch1:		xbuffy-nntp-gcc331.patch.bz2
-Buildrequires:	X11-devel
+Patch0:		xbuffy-3.4-multiple-box.patch
+Patch1:		xbuffy-nntp-gcc331.patch
+Buildrequires:	libx11-devel
+BuildRequires:	libxaw-devel
+BuildRequires:	libxt-devel
 BuildRoot:	%{_tmppath}/%{name}-buildroot
 
 %description
@@ -23,39 +25,29 @@ arrives.  Xbuffy can also run a program (such as a xterm with your mail reader)
 when you click on the mailbox.  
 
 %prep
-
-%setup
-
-#%patch0 -p1 -b .warly
+%setup -q
 %patch0
 %patch1
 
 %build
- 
-CONF_OPTS="--enable-nntp --enable-content-length"
-
-if [ -d /usr/local/src/imap ] ; then
-   %configure --with-cclient=/usr/local/src/imap $CONF_OPTS
-else
-   %configure $CONF_OPTS
-fi
-
+%configure2_5x --enable-nntp --enable-content-length
 %make
 
 %install
+rm -fr %buildroot
+install -m 755 -d $RPM_BUILD_ROOT%{_bindir}/
+install -s -m 755  xbuffy $RPM_BUILD_ROOT%{_bindir}/xbuffy
+install -m 755 -d $RPM_BUILD_ROOT%{_mandir}/man1/
+install -m 644 xbuffy.1 $RPM_BUILD_ROOT%{_mandir}/man1/xbuffy.1x
+install -m 755 -d $RPM_BUILD_ROOT%{_datadir}/X11/app-defaults/
+install -m 644  XBuffy.ad $RPM_BUILD_ROOT%{_datadir}/X11/app-defaults/XBuffy
 
-install -m 755 -d $RPM_BUILD_ROOT/usr/X11R6/bin/
-install -s -m 755  xbuffy $RPM_BUILD_ROOT/usr/X11R6/bin/xbuffy
-install -m 755 -d $RPM_BUILD_ROOT/usr/X11R6/man/man1/
-install -m 644 xbuffy.1 $RPM_BUILD_ROOT/usr/X11R6/man/man1/xbuffy.1x
-install -m 755 -d $RPM_BUILD_ROOT/usr/X11R6/lib/X11/app-defaults/
-install -m 644  XBuffy.ad $RPM_BUILD_ROOT/usr/X11R6/lib/X11/app-defaults/XBuffy
 %files
 %defattr(-,root,root)
-%attr(-,root,root) /usr/X11R6/bin/xbuffy
-%attr(-,root,root) /usr/X11R6/man/man1/xbuffy.1x*
-%attr(-,root,root) /usr/X11R6/lib/X11/app-defaults/XBuffy
 %doc ChangeLog README README.imap README.cclient boxfile.fmt boxfile.sample
+%{_bindir}/xbuffy
+%{_mandir}/man1/xbuffy.1x*
+%{_datadir}/X11/app-defaults/XBuffy
 
 %clean
 rm -rf $RPM_BUILD_ROOT
