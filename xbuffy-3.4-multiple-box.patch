@@ -1,0 +1,569 @@
+--- boxfile.c.warly	Thu Aug 19 18:41:48 1999
++++ boxfile.c	Wed Apr 25 14:59:02 2001
+@@ -30,14 +30,14 @@
+ 	"box", "title", "command", "audio", "mailbox", "newsbox", "origmode",
+ 	"newmode", "beep", "nobeep", "last", "headertime", "polltime",
+         "shortname", "longname", "background", "foreground", 
+-        "cclient", "countperiod", "keepopen", NULL
++        "cclient", "countperiod", "keepopen", "extrabox", NULL
+ };
+ 
+ enum TokType
+ {
+ 	UNK_T = 0, BOX_T, TITLE_T, COMMAND_T, AUDIO_T, MAILBOX_T, NEWSBOX_T,
+ 	ORIGMODE_T, NEWMODE_T, BEEP_T, NOBEEP_T, LAST_T, HEADER_T, POLL_T,
+-	SHORT_T, LONG_T, BG_T, FG_T, CCLIENT_T, COUNTPERIOD_T, KEEPOPEN_T
++	SHORT_T, LONG_T, BG_T, FG_T, CCLIENT_T, COUNTPERIOD_T, KEEPOPEN_T, EXTRABOX_T
+ };
+ 
+ typedef enum TokType TokenType;
+@@ -83,7 +83,6 @@
+ void clearBox(tempBox)
+ 	BoxInfo_t *tempBox;
+ {
+-        checkAndFree(tempBox->box);
+ 	checkAndFree(tempBox->command);
+ 	checkAndFree(tempBox->audioCmd);
+ 	checkAndFree(tempBox->boxTitle);
+@@ -129,7 +128,13 @@
+ 			strcpy(res, home);
+ 			res += NEWstrlen(home);
+ 		}
+-		else
++/*		else if(strncmp(*ptr,"$DATE",5)){
++			home = (char *) getenv("DATE");
++			strcpy(res, home);
++			res += NEWstrlen(home);
++			ptr+=4;
++		}
++*/		else
+ 			*(res++) = *ptr;
+ 
+ 		++ptr;
+@@ -210,7 +215,10 @@
+ void dumpBox(tempBox)
+ 	BoxInfo_t tempBox;
+ {
+-	printf("Dumping Box = *%s*\n", tempBox.box);
++	struct boxBox * t;
++	for (t = &tempBox.box; t->next != NULL; t = t->next) {
++		printf("Dumping Box = *%s*\n", t->box);
++	}
+ 	printf("type = %i\n", tempBox.type);
+ 	printf("command	= *%s*\n", showNull(tempBox.command));
+ 	printf("audio = *%s*\n", showNull(tempBox.audioCmd));
+@@ -223,7 +231,6 @@
+ #endif
+ 
+ 
+-
+ void readBoxfile(boxFile)
+ 	char *boxFile;
+ {
+@@ -232,8 +239,11 @@
+ 	char line[MAX_STRING];
+ 	int inBox;
+ 	char next[MAX_STRING];
++	struct boxBox * tmpbox; 
++	struct boxBox * lastbox; 
+ 
+-	tempBox.bgName = tempBox.fgName = tempBox.box = tempBox.command = tempBox.audioCmd = tempBox.boxTitle =tempBox.uname = tempBox.passwd = NULL;
++	tempBox.bgName = tempBox.fgName = tempBox.command = tempBox.audioCmd = tempBox.boxTitle =tempBox.uname = tempBox.passwd = NULL;
++	tempBox.box = (struct boxBox){ NULL, NULL }; 
+         tempBox.stream = NULL;
+    
+ 	clearBox(&tempBox);
+@@ -277,12 +287,22 @@
+ 				clearBox(&tempBox);
+ 			}
+ 
+-			tempBox.box = (char *) strdup(parseTwiddle(parseEnv(next)));
++			tempBox.box.box = (char *) strdup(parseTwiddle(parseEnv(next)));
++			tempBox.box.next = NULL;
++			lastbox = &tempBox.box;
+ 			inBox = TRUE;
+ 
+ 
+ 			break;
+ 
++		case EXTRABOX_T:
++			tmpbox = (struct boxBox * )malloc(sizeof(struct boxBox));	
++			tmpbox->box = (char *) strdup(parseTwiddle(parseEnv(next)));
++			tmpbox->next = NULL;
++			lastbox->next = tmpbox;
++			lastbox = tmpbox;
++			break;
++
+ 		case TITLE_T:
+ 			tempBox.boxTitle = (char *) strdup(next);
+ 			tempBox.BoxNameType = USR;
+@@ -373,7 +393,7 @@
+ 
+ 	if (inBox)
+ #ifndef TESTBOX
+-		initBox(tempBox.box,
++		initBox(tempBox.box, 
+ 				tempBox.type, tempBox.pollTime,
+ 				tempBox.headerTime, tempBox.BoxNameType,
+ 				tempBox.command,
+--- xbuffy.c.warly	Thu Aug 19 18:41:49 1999
++++ xbuffy.c	Wed Apr 25 13:53:32 2001
+@@ -676,112 +676,136 @@
+     char From[MAX_STRING], Subject[MAX_STRING];
+     register int count = 0;
+     int status = UNKNOWN;
++    char* pre;
++    int first;
++    int size = 0;
+     register Boolean in_header = FALSE;
+     struct stat f_stat;
++    struct boxBox * t;
+ 
+     *beenTouched = FALSE;
+    
+-    if (isLocked(mailBox->box))
+-       return (mailBox->n);
+-
++    for (t = &mailBox->box; t != NULL; t = t->next){
++    
++	    if (isLocked(t->box))
++	       return (mailBox->n);
+ 
+-    stat(mailBox->box, &f_stat);
++	    stat(t->box, &f_stat);
+ 
+-    if ((f_stat.st_size != mailBox->st_size) ||
+-        (f_stat.st_mtime > mailBox->box_mtime))
++	    if (f_stat.st_mtime > mailBox->box_mtime)
++	    {
++		mailBox->box_mtime = f_stat.st_mtime;
++		*beenTouched = TRUE;
++		continue;
++	    }
++	    size += f_stat.st_size;
++    }
++    
++    if (size != mailBox->st_size)
+     {
+-        mailBox->st_size = f_stat.st_size;
+-        mailBox->box_mtime = f_stat.st_mtime;
++	mailBox->st_size = size;
+         *beenTouched = TRUE;
+     }
+-
+     if ((!*beenTouched) && (headerString == NULL))
+-        return (mailBox->n);
+-
+-    fp = fopen(mailBox->box, "r");
+-    if (fp == NULL)
+-    {
+-        fprintf(stderr, "Error: Could not open mailbox %s\n",mailBox->box);
+-        return 0;
+-    }
+-
+-    From[0] = Subject[0] = '\0';
+-
+-
+-    while (fgets(buffer, MAX_STRING - 2, fp) != 0)
+-    {
+-       long CL = 0L;
+-       int has_CL = FALSE;
+-
+-        buffer[MAX_STRING - 1] = '\0';  /* just in case */
+-        if ((strchr(buffer, '\n') == NULL) && (!feof(fp)))
+-        {
+-            int c;
+-
+-            while ((c = getc(fp)) != EOF && c != '\n'); /* keep reading */
+-        }
+-
+-        if ((!in_header) && (real_from(buffer,mailBox->type)))
+-        {
+-	    has_CL = FALSE;
+-            in_header = TRUE;
+-            status = NEW_MSG;
+-        }
+-        else if (in_header)
+-        {
+-            if (header_cmp(buffer, "From", NULL))
+-            {
+-                strcpy(From, buffer);
+-
+-            }
++	return (mailBox->n);
+ 
+-	   
+-	   if (header_cmp(buffer, "Content-Length", NULL))
+-	   {
+-	      has_CL = TRUE;
+-	      CL = atol(buffer+15);
+-	   }
+-
+-            if (header_cmp(buffer, "Subject", NULL))
+-            {
+-                strcpy(Subject, buffer);
+-            }
++    for (t = &mailBox->box; t != NULL; t = t->next){
++	    
++	    fp = fopen(t->box, "r");
++	    if (fp == NULL)
++	    {
++		fprintf(stderr, "Error: Could not open mailbox %s\n",t->box);
++		continue;
++	    }
+ 
+-            if (header_cmp(buffer, "Status", NULL))
+-            {
+-                remove_header_keyword(buffer);
+-                if (*buffer == 'N')
+-                    status = NEW_MSG;
+-                else
+-                    status = READ_MSG;
+-            }
+-            else if (buffer[0] == LINEFEED)
+-            {
++	    first=0;
++	    while (fgets(buffer, MAX_STRING - 2, fp) != 0)
++	    {
++	       long CL = 0L;
++	       int has_CL = FALSE;
++	     
++	       if (!first && headerString != NULL)
++	       {
++		    if (NEWstrlen(t->box) != 0){
++		        pre = strrchr(t->box,'/');
++		        if (pre){
++		    	    DynInsert(headerString, ((DynHigh(headerString) > 0) ? (DynSize(headerString)) : 0),  pre+1, NEWstrlen(pre+1));
++		    	    DynInsert(headerString, ((DynHigh(headerString) > 0) ? (DynSize(headerString)) : 0),  "\n", 1);
++		        }
++		    }
++		    first=1;
++	        }
++
++
++		buffer[MAX_STRING - 1] = '\0';  /* just in case */
++		if ((strchr(buffer, '\n') == NULL) && (!feof(fp)))
++		{
++		    int c;
++
++		    while ((c = getc(fp)) != EOF && c != '\n'); /* keep reading */
++		}
++
++		if ((!in_header) && (real_from(buffer,mailBox->type)))
++		{
++		    has_CL = FALSE;
++		    in_header = TRUE;
++		    status = NEW_MSG;
++		}
++		else if (in_header)
++		{
++		    if (header_cmp(buffer, "From", NULL))
++		    {
++			strcpy(From, buffer);
++
++		    }
++
++		   
++		   if (header_cmp(buffer, "Content-Length", NULL))
++		   {
++		      has_CL = TRUE;
++		      CL = atol(buffer+15);
++		   }
++
++		    if (header_cmp(buffer, "Subject", NULL))
++		    {
++			strcpy(Subject, buffer);
++		    }
++
++		    if (header_cmp(buffer, "Status", NULL))
++		    {
++			remove_header_keyword(buffer);
++			if (*buffer == 'N')
++			    status = NEW_MSG;
++			else
++			    status = READ_MSG;
++		    }
++		    else if (buffer[0] == LINEFEED)
++		    {
+ #ifdef USE_CONTENT_LENGTH
+-	       if (has_CL)
+-	        fseek(fp,CL,SEEK_CUR);
++		       if (has_CL)
++			fseek(fp,CL,SEEK_CUR);
+ #endif	       
+-                in_header = FALSE;
+-                if ((status == NEW_MSG) || (mailBox->origMode))
+-                {
+-                    count++;
+-                    if (headerString != NULL)
+-                    {
+-                        if (NEWstrlen(From) != 0)
+-                            DynInsert(headerString, ((DynHigh(headerString) > 0) ? (DynSize(headerString)) : 0), From, NEWstrlen(From));
+-
+-                        if (NEWstrlen(Subject) != 0)
+-                            DynInsert(headerString, ((DynHigh(headerString) > 0) ? (DynSize(headerString)) : 0), Subject, NEWstrlen(Subject));
+-                    }
+-                }
+-                From[0] = Subject[0] = '\0';
++			in_header = FALSE;
++			if ((status == NEW_MSG) || (mailBox->origMode))
++			{
++			    count++;
++			    if (headerString != NULL)
++			    {
++				if (NEWstrlen(From) != 0)
++				    DynInsert(headerString, ((DynHigh(headerString) > 0) ? (DynSize(headerString)) : 0), From, NEWstrlen(From));
++
++				if (NEWstrlen(Subject) != 0)
++				    DynInsert(headerString, ((DynHigh(headerString) > 0) ? (DynSize(headerString)) : 0), Subject, NEWstrlen(Subject));
++			    }
++			}
++			From[0] = Subject[0] = '\0';
+ 
+-            }
++		    }
+ 
+-        }
++		}
++	    }
++	    fclose(fp);
+     }
+-    fclose(fp);
+-
+     return count;
+ }
+ 
+@@ -806,12 +830,12 @@
+    
+ void initBox(box, BoxType, pollTime, headerTime, BoxNameType, command, audioCmd,
+                  title, origMode, nobeep, bgName, fgName, countperiod, keepopen)
+-    char *box;
++    struct boxBox box;
+     BoxType_t BoxType;
+     int pollTime;
+     int headerTime;
+     BoxNameType_t BoxNameType;
+-    char *command;
++    char * command;
+     char *audioCmd;
+     char *title;
+     Boolean origMode;
+@@ -826,17 +850,19 @@
+     BoxInfo_t tempBox;
+     int boxSize;
+     char *ptr;
+-
++    struct boxBox * t;
++    
+ /* get rid of trailing whitespace in box */
+ 
+-    ptr = box + NEWstrlen(box) - 1;
+-
+-    while (isspace(*ptr))
+-        *ptr-- = '\0';
++    for(t = &box; t != NULL; t = t->next) { 
++    	ptr = t->box + NEWstrlen(t->box) - 1;
+ 
++    	while (isspace(*ptr))
++        	*ptr-- = '\0';
++    }
+ 
+ #ifdef DEBUG
+-    fprintf(stderr, "Init Box = *%s*\n", box);
++    for(t = &box; t != NULL; t = t->next) fprintf(stderr, "Init box = %s\n", t->box);
+     fprintf(stderr, "nboxes = %i\n", nBoxes);
+     fprintf(stderr, "type = %i\n", BoxType);
+     fprintf(stderr, "command    = *%s*\n", command);
+@@ -849,7 +875,8 @@
+     fprintf(stderr, "keepopen = %i\n\n",keepopen);
+ #endif
+ 
+-    tempBox.box = NEWstrdup(box);
++    tempBox.box = box;
++    for(t = &box; t != NULL; t = t->next) t->box = NEWstrdup(t->box);
+     tempBox.type = BoxType;
+     tempBox.boxNum = nBoxes;
+ 
+@@ -921,13 +948,13 @@
+ 	    CurrentBox = &tempBox;
+ 	  
+ 	    while (!tempBox.stream)
+-	       tempBox.stream = mail_open(NIL, tempBox.box, OP_READONLY);
++	       tempBox.stream = mail_open(NIL, tempBox.box.box, OP_READONLY);
+ 	  
+             CurrentBox = NULL;
+ 	  
+             if (!tempBox.stream) 
+             {
+-	      fprintf(stderr,"Can't open IMAP mailbox %s\n",tempBox.box);
++	      fprintf(stderr,"Can't open IMAP mailbox %s\n",tempBox.box.box);
+ 	    }
+ 	 }
+ 	 else 
+@@ -971,7 +998,7 @@
+     str = (char *) strtok(boxes, ":, ");
+     while (str != NULL)
+     {
+-        initBox(NEWstrdup(str), MAILBOX, envPolltime, envHeadertime, UNDEF, data.command,
++        initBox((struct boxBox){ NEWstrdup(str), NULL}, MAILBOX, envPolltime, envHeadertime, UNDEF, data.command,
+                 data.audioCmd, NULL, data.origMode, data.nobeep,NULL,NULL,0,0);
+ 
+         str = (char *) strtok(NULL, ":, ");
+@@ -1013,7 +1040,7 @@
+         BoxInfo_t tempBox;
+ 
+         tempBox.boxNum = nBoxes;
+-        tempBox.box = NEWstrdup(str);
++        tempBox.box.box = NEWstrdup(str);
+         boxInfo[nBoxes].type = NNTPBOX;
+         boxInfo[nBoxes].n = CountNNTP(&boxInfo[nBoxes], NULL, NULL);
+         nBoxes++;
+@@ -1064,10 +1091,10 @@
+         switch (currentBox->BoxNameType)
+         {
+         case SHORT:
+-            strcpy(line, EliminatePath(currentBox->box));
++            strcpy(line, EliminatePath(currentBox->box.box));
+             break;
+         case LONG:
+-            strcpy(line, currentBox->box);
++            strcpy(line, currentBox->box.box);
+             break;
+         case NONE:
+         case USR:
+@@ -1084,7 +1111,7 @@
+         {
+         case SHORT:
+         case LONG:
+-            strcpy(line, currentBox->box);
++            strcpy(line, currentBox->box.box);
+             break;
+         case NONE:
+         case USR:
+@@ -1165,6 +1192,7 @@
+ 
+ #ifdef DEBUG
+    char pause_string[10];
++   struct boxBox *t;
+ /*  gets(pause_string);*/
+ #endif
+    
+@@ -1270,7 +1298,7 @@
+ 
+             if (mailArgs)
+             {
+-                initBox(NEWstrdup(*argv), MAILBOX, envPolltime, envHeadertime,
++                initBox((struct boxBox){ NEWstrdup(*argv), NULL } , MAILBOX, envPolltime, envHeadertime,
+                         UNDEF, data.command, data.audioCmd, NULL, data.origMode, data.nobeep,NULL,NULL);
+ 
+             }
+@@ -1279,7 +1307,7 @@
+             else
+             {
+ 
+-                initBox(NEWstrdup(*argv), NNTPBOX, envPolltime, envHeadertime,
++                initBox((struct boxBox){ NEWstrdup(*argv), NULL}, NNTPBOX, envPolltime, envHeadertime,
+                         UNDEF, data.command, data.audioCmd, NULL, data.origMode, data.nobeep,NULL,NULL);
+ 
+             }
+@@ -1436,7 +1464,7 @@
+     fprintf(stderr, "bg = %i, fg = %i maxSize = %i\n", data.bg, data.fg,maxBoxSize);
+     for (i = 0; i < nBoxes; i++)
+     {
+-        fprintf(stderr, "box = %s\n", boxInfo[i].box);
++        for(t = &boxInfo[i].box; t != NULL; t = t->next) fprintf(stderr, "box = %s\n", t->box);
+         fprintf(stderr, "pollTime = %i\n", boxInfo[i].pollTime);
+         fprintf(stderr, "headerTime = %i\n", boxInfo[i].headerTime);
+         fprintf(stderr, "origMode = %i\n", boxInfo[i].origMode);
+@@ -1452,7 +1480,8 @@
+     if (setpriority(PRIO_PROCESS, 0, envPriority) == -1)
+         perror("Proirity change Failed");
+ #endif
+-   
++
++    
+ if (!data.nofork)
+ {     
+     /* put ourself in the background */
+--- xbuffy.h.warly	Thu Aug 19 18:41:49 1999
++++ xbuffy.h	Wed Apr 25 11:40:51 2001
+@@ -15,7 +15,6 @@
+ 
+ *******************************************************************************/
+ 
+-
+ #ifndef _XBUFFY_H_
+ #define _XBUFFY_H_
+ 
+@@ -63,11 +62,16 @@
+ 
+ typedef struct articles_s Articles_t;	
+ 
++struct boxBox {
++	char * box;
++	struct boxBox * next;
++};
++
+ 
+ struct BoxInfo_s{
+   Widget w;
+   int boxNum;			/* the box number */
+-  char *box;			/* the box filename or newsgroup */
++  struct boxBox box;
+   BoxType_t type;		/* the box type (mail, news, etc) */
+ 
+   DynObject articles; /* for newsgroups, the read pairs  */
+@@ -76,7 +80,7 @@
+   off_t st_size;		/* size of file on last read */
+   int n;				/* the number of messages in the box */
+   
+-  char *command;
++  char * command;
+   char *audioCmd;
+   char *boxTitle;
+   int last;
+--- nntp.c.warly	Thu Aug 19 18:41:48 1999
++++ nntp.c	Wed Apr 25 11:40:51 2001
+@@ -51,9 +51,9 @@
+ 
+ #endif
+ 
+-void Fatal(va_alist)
++void Fatal(char *fmt, ...)
+ {
+-	char *fmt;
++//	char *fmt;
+ 	extern int errno;
+ 	va_list p;
+ 
+@@ -212,10 +212,10 @@
+ 		char *tmp;
+ 		char *backp;
+ 
+-		if (strncasecmp(line, newsBox->box, NEWstrlen(newsBox->box)) != 0)
++		if (strncasecmp(line, newsBox->box.box, NEWstrlen(newsBox->box.box)) != 0)
+ 			continue;
+ 
+-		tmp = line + NEWstrlen(newsBox->box);
++		tmp = line + NEWstrlen(newsBox->box.box);
+ 		while ((!isdigit(*tmp)) && (*tmp != '\n'))
+ 			tmp++;
+ 
+@@ -329,7 +329,7 @@
+ 
+ 
+ 	/* send group selection */
+-	sprintf(line, "group %s", newsBox->box);
++	sprintf(line, "group %s", newsBox->box.box);
+ 	fputs(line, NNTP_fOut);
+ 	fputeol(NNTP_fOut);
+ 
+@@ -424,7 +424,7 @@
+ 		char *hdrPtr;
+ 
+ 		headers = DynCreate(sizeof(char), MAX_STRING);
+-		tempBox.box = "uva.general";
++		tempBox.box.box = "uva.general";
+ 
+ 		printf("There are %i articles\n", CountNNTP(&tempBox, NULL, &dummy));
+ 

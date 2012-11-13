@@ -1,0 +1,20 @@
+--- nntp.c	2003-12-07 13:21:07.000000000 +0100
++++ /home/fvill/tmp/nntp.c	2003-12-07 13:02:34.000000000 +0100
+@@ -26,7 +26,7 @@
+ #include <netdb.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+-#include <varargs.h>
++#include <stdarg.h>
+ #include <errno.h>
+ #include <sys/stat.h>
+ 
+@@ -57,7 +57,7 @@
+ 	extern int errno;
+ 	va_list p;
+ 
+-	va_start(p);
++	va_start(p,fmt);
+ 
+ 	fmt = va_arg(p, char *);
+ 	vfprintf(stderr, fmt, p);
