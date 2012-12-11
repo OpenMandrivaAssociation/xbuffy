@@ -52,3 +52,58 @@ install -m 644  XBuffy.ad $RPM_BUILD_ROOT%{_datadir}/X11/app-defaults/XBuffy
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+
+
+%changelog
+* Tue Feb 01 2011 Funda Wang <fwang@mandriva.org> 3.4-13mdv2011.0
++ Revision: 634881
+- bunzip2 the patches
+- use standard prefix
+
+* Sun Sep 20 2009 Thierry Vignaud <tv@mandriva.org> 3.4-12mdv2010.0
++ Revision: 445892
+- rebuild
+
+* Sun Aug 03 2008 Thierry Vignaud <tv@mandriva.org> 3.4-11mdv2009.0
++ Revision: 262259
+- rebuild
+
+* Thu Jul 31 2008 Thierry Vignaud <tv@mandriva.org> 3.4-10mdv2009.0
++ Revision: 256630
+- rebuild
+- kill re-definition of %%buildroot on Pixel's request
+
+  + Olivier Blin <oblin@mandriva.com>
+    - restore BuildRoot
+
+* Wed Dec 12 2007 Thierry Vignaud <tv@mandriva.org> 3.4-8mdv2008.1
++ Revision: 118975
+- buildrequires X11-devel instead of XFree86-devel
+- use %%mkrel
+- import xbuffy
+
+
+* Thu Jun 02 2005 Nicolas Lécureuil <neoclust@mandriva.org> 3.4-8mdk
+- Rebuild
+
+* Sun Dec 07 2003 Franck Villaume <fvill@freesurf.fr> 3.4-7mdk
+- clean header
+- fix gcc 3.3.1 compil
+
+* Mon Apr 28 2003 Warly <warly@mandrakesoft.com> 3.4-6mdk
+- fix buildrequires
+
+* Fri Aug 24 2001 Etienne Faure <etienne@mandrakesoft.com> 3.4-5mdk
+- rebuild
+
+* Wed Apr 25 2001 Warly <warly@mandrakesoft.com> 3.4-4mdk
+- Add subbox title in mail displaying
+
+* Mon Apr 23 2001 Warly <warly@mandrakesoft.com> 3.4-3mdk
+- does not stop working with empty boxfiles.
+
+* Sat Dec 23 2000 Warly <warly@mandrakesoft.com> 3.4-2mdk
+- add a patch to put multiple file in the same box
+
+* Tue Aug 29 2000 Frederic Lepied <flepied@mandrakesoft.com> 3.4-1mdk
+- first Mandrake release.
