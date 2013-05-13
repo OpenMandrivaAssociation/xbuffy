@@ -1,6 +1,6 @@
 %define name xbuffy
 %define version 3.4
-%define release %mkrel 13
+%define release  14
 
 Summary:	X-based multiple mailbox biff
 Name:		%{name}
@@ -15,7 +15,6 @@ Patch1:		xbuffy-nntp-gcc331.patch
 Buildrequires:	libx11-devel
 BuildRequires:	pkgconfig(xaw7)
 BuildRequires:	pkgconfig(xt)
-BuildRoot:	%{_tmppath}/%{name}-buildroot
 
 %description
 Xbuffy is a program that watches multiple mailboxes and newsgroups
