@@ -13,8 +13,8 @@ Url:		ftp://ftp.virginia.edu:/pub/xbuffy/
 Patch0:		xbuffy-3.4-multiple-box.patch
 Patch1:		xbuffy-nntp-gcc331.patch
 Buildrequires:	libx11-devel
-BuildRequires:	libxaw-devel
-BuildRequires:	libxt-devel
+BuildRequires:	pkgconfig(xaw7)
+BuildRequires:	pkgconfig(xt)
 BuildRoot:	%{_tmppath}/%{name}-buildroot
 
 %description
