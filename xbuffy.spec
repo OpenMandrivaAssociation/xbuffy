@@ -12,6 +12,11 @@ Source:		%{name}-%{version}.tar.bz2
 Url:		ftp://ftp.virginia.edu:/pub/xbuffy/
 Patch0:		xbuffy-3.4-multiple-box.patch
 Patch1:		xbuffy-nntp-gcc331.patch
+BuildRequires:	autoconf
+BuildRequires:	automake
+BuildRequires:	libtool-base
+BuildRequires:	slibtool
+BuildRequires:	make
 Buildrequires:	libx11-devel
 BuildRequires:	pkgconfig(xaw7)
 BuildRequires:	pkgconfig(xt)
